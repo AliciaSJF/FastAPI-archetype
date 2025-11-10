@@ -30,7 +30,10 @@ fastapi-template/
 - ✅ Estructura organizada y escalable
 - ✅ Autenticación JWT
 - ✅ Base de datos PostgreSQL con SQLAlchemy
+- ✅ Alembic para migraciones de base de datos
 - ✅ Lifespan para inicialización y verificación de BD
+- ✅ Sistema de logging con colores y trazabilidad mejorada
+- ✅ Sistema de excepciones personalizadas con gestores centralizados
 - ✅ Schemas Pydantic para validación
 - ✅ Separación de responsabilidades (routers, services, repositories, schemas)
 - ✅ Repositorios dedicados para acceso a datos
@@ -55,18 +58,28 @@ pip install -r requirements.txt
 
 3. Configurar variables de entorno:
 ```bash
-# Crear archivo .env con la configuración de PostgreSQL
-# DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+# Copiar el archivo de ejemplo
+cp env.example .env
+
+# Editar .env con tus configuraciones
+# Especialmente importante: DATABASE_URL y SECRET_KEY
 ```
 
 4. Asegúrate de tener PostgreSQL corriendo localmente o usa Docker Compose
 
-5. Ejecutar la aplicación:
+5. Aplicar migraciones de base de datos:
 ```bash
-uvicorn src.app.main:app --reload
+alembic upgrade head
 ```
 
-**Nota**: El lifespan de la aplicación verificará automáticamente la conexión a la base de datos al iniciar.
+6. Ejecutar la aplicación:
+```bash
+uvicorn src.app.main:src.app --reload
+```
+
+**Nota**: 
+- El lifespan de la aplicación verificará automáticamente la conexión a la base de datos al iniciar.
+- Las migraciones de base de datos se gestionan con Alembic. Ver [ALEMBIC.md](ALEMBIC.md) para más información.
 
 ### Opción 2: Docker
 
@@ -175,5 +188,71 @@ La aplicación incluye un lifespan que:
 - Inicializa las tablas de la base de datos al arrancar
 - Prueba la conexión a PostgreSQL antes de aceptar requests
 - Cierra las conexiones correctamente al apagar la aplicación
+
+## Migraciones de Base de Datos
+
+Este proyecto usa **Alembic** para gestionar las migraciones de base de datos.
+
+### Comandos Básicos
+
+```bash
+# Ver el estado actual
+alembic current
+
+# Crear una nueva migración (automática)
+alembic revision --autogenerate -m "Descripción del cambio"
+
+# Aplicar migraciones
+alembic upgrade head
+
+# Reversar última migración
+alembic downgrade -1
+```
+
+Para una guía completa sobre cómo usar Alembic, consulta [ALEMBIC.md](ALEMBIC.md).
+
+## Logging
+
+El proyecto incluye un sistema de logging avanzado con:
+
+- **Colores** para diferentes niveles de log
+- **Trazabilidad mejorada** (módulo, clase, función, línea)
+- **Bibliotecas silenciadas** (SQLAlchemy, Uvicorn, etc.)
+- **Formato detallado** para fácil depuración
+
+**Ejemplo de uso:**
+```python
+from app.core.logging_config import get_logger
+
+logger = get_logger(__name__)
+logger.info("Mensaje informativo")
+logger.error("Error ocurrido")
+```
+
+Para más información, consulta [LOGGING.md](LOGGING.md).
+
+## Sistema de Excepciones
+
+El proyecto incluye un sistema completo de gestión de excepciones con:
+
+- **Excepciones personalizadas** para errores comunes (NotFoundError, AlreadyExistsError, ValidationError, etc.)
+- **Gestores centralizados** que formatean todas las respuestas de error de forma consistente
+- **Logging automático** de todas las excepciones con contexto completo
+- **Formato estándar** de respuesta de error
+
+**Ejemplo de uso:**
+```python
+from app.core.exceptions import NotFoundError, AlreadyExistsError
+
+# Recurso no encontrado
+raise NotFoundError(resource="Usuario", identifier=user_id)
+
+# Recurso duplicado
+raise AlreadyExistsError(resource="Usuario", field="email", value=email)
+```
+
+Todas las excepciones se manejan automáticamente y devuelven respuestas en formato JSON consistente.
+
+Para más información y ejemplos, consulta [EXCEPCIONES.md](EXCEPCIONES.md).
 
 ## Desarrollo

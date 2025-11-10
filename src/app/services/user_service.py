@@ -5,11 +5,14 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
+from app.core.logging_config import get_logger
 from app.core.security import verify_password
 from app.db.models.user import User
 from app.repositories import user_repository
 from app.schemas import user as user_schema
 from app.utils.hashing import hash_password
+
+logger = get_logger(__name__)
 
 
 def get_user(db: Session, user_id: int) -> Optional[User]:
@@ -34,13 +37,16 @@ def get_users(db: Session, skip: int = 0, limit: int = 100) -> List[User]:
 
 def create_user(db: Session, user: user_schema.UserCreate) -> User:
     """Crea un nuevo usuario."""
+    logger.debug(f"Creando usuario: {user.username}")
     hashed_password = hash_password(user.password)
-    return user_repository.create(
+    new_user = user_repository.create(
         db,
         email=user.email,
         username=user.username,
         hashed_password=hashed_password,
     )
+    logger.info(f"Usuario creado: ID={new_user.id}, username={new_user.username}")
+    return new_user
 
 
 def update_user(

@@ -2,18 +2,30 @@
 Aplicación principal FastAPI
 """
 from contextlib import asynccontextmanager
-import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.core.config import settings
+from app.core.logging_config import setup_logging, get_logger
+from app.core.exception_handlers import (
+    app_exception_handler,
+    validation_exception_handler,
+    http_exception_handler,
+    general_exception_handler,
+    database_exception_handler,
+)
+from app.core.exceptions import AppException
 from app.db.session import engine, Base, SessionLocal
 from app.routers import users, items
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from sqlalchemy.exc import SQLAlchemyError
 
-# Configurar logging
-logger = logging.getLogger(__name__)
+# Configurar logging con colores y trazabilidad
+setup_logging(debug=settings.DEBUG)
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -26,18 +38,15 @@ async def lifespan(app: FastAPI):
     logger.info("Inicializando base de datos...")
     
     try:
-        # Crear las tablas si no existen
-        Base.metadata.create_all(bind=engine)
-        logger.info("Tablas de base de datos creadas/verificadas")
-        
-        # Probar la conexión
+        # Probar la conexión (las tablas se crean con Alembic)
         with SessionLocal() as db:
             result = db.execute(text("SELECT 1"))
             result.scalar()
             logger.info("Conexión a la base de datos verificada correctamente")
+            logger.info("Nota: Las migraciones de base de datos se gestionan con Alembic")
             
     except Exception as e:
-        logger.error(f"Error al inicializar la base de datos: {e}")
+        logger.error(f"Error al conectar con la base de datos: {e}")
         raise
     
     yield
@@ -55,6 +64,13 @@ app = FastAPI(
     debug=settings.DEBUG,
     lifespan=lifespan,
 )
+
+# Registrar gestores de excepciones (orden importante: más específicas primero)
+app.add_exception_handler(AppException, app_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(SQLAlchemyError, database_exception_handler)  # Maneja errores de SQLAlchemy
+app.add_exception_handler(Exception, general_exception_handler)  # Catch-all para todo lo demás
 
 # Configurar CORS
 app.add_middleware(
